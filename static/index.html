@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAVAMESH | ESP32 Telemetry & Vision Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="cyber-theme">
+    <!-- Top HUD Navigation Bar -->
+    <header class="hud-header">
+        <div class="brand-container">
+            <img src="/static/navamesh_logo.png" alt="NAVAMESH" class="brand-logo-img">
+            <div class="brand-text-block">
+                <div class="brand-name">NAVAMESH <span class="brand-tag">EST. 2025</span></div>
+                <div class="brand-subtitle">ESP32 TELEMETRY &amp; COMPUTER VISION RECON SUITE</div>
+            </div>
+        </div>
+
+        <div class="hud-connection-bar">
+            <div class="telemetry-badge" id="connStatusBadge">
+                <span class="pulse-dot"></span>
+                <span id="connStatusText">SIMULATION ACTIVE</span>
+            </div>
+
+            <!-- ESP32 WiFi IP & Serial Controls -->
+            <div class="serial-controls">
+                <input type="text" id="espIpInput" class="cyber-select" placeholder="ESP32 IP (e.g. 192.168.x.x)" style="width: 170px;" title="ESP32 WiFi IP Address">
+                <button id="btnConnectWifi" class="cyber-btn sm primary" title="Connect to ESP32 over WiFi">IP LINK</button>
+
+                <select id="portSelect" class="cyber-select" title="Select USB/COM Port">
+                    <option value="">Scanning Ports...</option>
+                </select>
+                <button id="btnScanPorts" class="cyber-btn sm" title="Refresh COM Ports">SCAN</button>
+                <button id="btnConnectSerial" class="cyber-btn sm primary">COM LINK</button>
+                <button id="btnDisconnectSerial" class="cyber-btn sm danger" style="display:none;">DISCONNECT</button>
+            </div>
+
+            <div class="sim-toggle-wrapper">
+                <label class="switch-label">SIMULATOR</label>
+                <label class="switch">
+                    <input type="checkbox" id="simToggle" checked>
+                    <span class="slider round"></span>
+                </label>
+            </div>
+
+            <div class="hud-time-block">
+                <span class="hud-time" id="hudClock">00:00:00</span>
+                <span class="hud-uptime">UPTIME: <span id="hudUptime">0s</span></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Container -->
+    <main class="dashboard-body">
+        
+        <!-- Action Hero: Launch Vision Recon Modal -->
+        <section class="hero-action-banner">
+            <div class="hero-left">
+                <div class="hero-title">
+                    <span class="glitch-icon">⚡</span> TERRAIN RECON &amp; DISASTER INTELLIGENCE
+                </div>
+                <div class="hero-desc">
+                    High-precision OpenCV segmentation for <strong>Drought Desiccation</strong> and <strong>Heavy Rainfall Inundation</strong> with algorithmic <strong>Sky Exclusion</strong>.
+                </div>
+            </div>
+            <div class="hero-right">
+                <button id="btnOpenReconModal" class="cyber-btn lg glow-btn">
+                    <span class="btn-icon">📸</span> OPEN IMAGE RECON &amp; CAPTURE SUITE
+                </button>
+            </div>
+        </section>
+
+        <!-- Sensor Telemetry Grid (Focused strictly on active sensors: BMP, MPU, NRF) -->
+        <div class="telemetry-grid">
+            
+            <!-- BMP Panel (Barometer, Temperature, Altitude) -->
+            <div class="cyber-card bmp-panel">
+                <div class="card-header">
+                    <div class="card-title"><span class="neon-bullet">■</span> BMP280 BAROMETER</div>
+                    <span class="chip">BMP280 / BMP180</span>
+                </div>
+                <div class="card-body">
+                    <div class="metric-row">
+                        <div class="metric-box">
+                            <span class="metric-label">PRESSURE</span>
+                            <div class="metric-val"><span id="bmpPressure">1013.2</span> <span class="unit">hPa</span></div>
+                            <div class="mini-bar-track"><div class="mini-bar-fill" id="pressureBar" style="width: 75%;"></div></div>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">ALTITUDE</span>
+                            <div class="metric-val"><span id="bmpAltitude">142.5</span> <span class="unit">m</span></div>
+                            <div class="mini-bar-track"><div class="mini-bar-fill" id="altitudeBar" style="width: 45%;"></div></div>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">TEMPERATURE</span>
+                            <div class="metric-val"><span id="bmpTemp">28.4</span> <span class="unit">°C</span></div>
+                            <div class="mini-bar-track"><div class="mini-bar-fill" id="tempBar" style="width: 58%;"></div></div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="altitudeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MPU Panel (MPU6050 Gyro, Accel, Artificial Horizon) -->
+            <div class="cyber-card mpu-panel">
+                <div class="card-header">
+                    <div class="card-title"><span class="neon-bullet">■</span> MPU6050 6-AXIS IMU</div>
+                    <span class="chip">ACCEL &amp; GYRO</span>
+                </div>
+                <div class="card-body">
+                    <div class="mpu-visual-row">
+                        <!-- Artificial Horizon Canvas -->
+                        <div class="horizon-wrapper">
+                            <canvas id="horizonCanvas" width="160" height="160"></canvas>
+                            <div class="horizon-label">ARTIFICIAL HORIZON</div>
+                        </div>
+                    </div>
+                    <!-- Accel axes -->
+                    <div class="accel-row">
+                        <div class="accel-box">
+                            <span class="axis">AX</span>
+                            <span class="reading"><span class="num" id="mpuAx">0.02</span><span class="g">g</span></span>
+                        </div>
+                        <div class="accel-box">
+                            <span class="axis">AY</span>
+                            <span class="reading"><span class="num" id="mpuAy">-0.05</span><span class="g">g</span></span>
+                        </div>
+                        <div class="accel-box">
+                            <span class="axis">AZ</span>
+                            <span class="reading"><span class="num" id="mpuAz">0.98</span><span class="g">g</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NRF Panel (NRF24L01 RF Telemetry) -->
+            <div class="cyber-card nrf-panel">
+                <div class="card-header">
+                    <div class="card-title"><span class="neon-bullet">■</span> NRF24L01 RF TRANSCEIVER</div>
+                    <span class="chip">2.4 GHz LINK</span>
+                </div>
+                <div class="card-body">
+                    <div class="metric-row">
+                        <div class="metric-box">
+                            <span class="metric-label">SIGNAL (RSSI)</span>
+                            <div class="metric-val"><span id="nrfSignal">-64</span> <span class="unit">dBm</span></div>
+                            <div class="rf-signal-bars" id="rfSignalBars">
+                                <span class="bar active"></span>
+                                <span class="bar active"></span>
+                                <span class="bar active"></span>
+                                <span class="bar active"></span>
+                                <span class="bar"></span>
+                            </div>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">LINK QUALITY</span>
+                            <div class="metric-val"><span id="nrfLink">92</span> <span class="unit">%</span></div>
+                            <div class="mini-bar-track"><div class="mini-bar-fill" id="nrfLinkBar" style="width: 92%;"></div></div>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">RF CHANNEL</span>
+                            <div class="metric-val"><span id="nrfChannel">CH 76</span></div>
+                            <span class="sub-label">2476 MHz</span>
+                        </div>
+                    </div>
+                    <div class="nrf-bottom-row">
+                        <div class="packet-info">
+                            <span>PACKETS RECEIVED: <strong id="nrfPackets">1284</strong></span>
+                            <span>PACKET LOSS: <strong id="nrfLoss">0.2%</strong></span>
+                        </div>
+                        <div class="status-pill green">RADIO LINK SYNCHRONIZED</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL: IMAGE RECON & UPLOAD SUITE (DUAL OPTIONS)                          -->
+    <!-- ========================================================================= -->
+    <div id="reconModal" class="cyber-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-dialog">
+            
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="neon-glyph">❖</span> IMAGE RECON &amp; COMPUTER VISION SUITE
+                </div>
+                <button class="modal-close" id="btnCloseModal">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                
+                <!-- The 2 Primary Options Requested by User -->
+                <div class="dual-options-selector">
+                    <button class="option-btn" id="btnOptionEsp32Cam">
+                        <div class="opt-icon">📷</div>
+                        <div class="opt-info">
+                            <div class="opt-title">OPTION 1: UPLOAD IMAGE FROM ESP32 CAM</div>
+                            <div class="opt-desc">Direct hardware optical capture from onboard OV2640 module</div>
+                        </div>
+                        <div class="opt-arrow">➔</div>
+                    </button>
+
+                    <button class="option-btn active" id="btnOptionLaptop">
+                        <div class="opt-icon">💻</div>
+                        <div class="opt-info">
+                            <div class="opt-title">OPTION 2: UPLOAD IMAGE FROM LAPTOP</div>
+                            <div class="opt-desc">Run precision OpenCV Drought &amp; Flood segmentation with Sky Exclusion</div>
+                        </div>
+                        <div class="opt-arrow">➔</div>
+                    </button>
+                </div>
+
+                <!-- SECTION 1: ESP32-CAM CAPTURE VIEW -->
+                <div id="sectionEsp32Cam" class="recon-section" style="display: none;">
+                    <div class="section-notice">
+                        <strong>ESP32-CAM LIVE OPTICAL CAPTURE FEED</strong>
+                    </div>
+
+                    <div class="cam-action-bar">
+                        <button id="btnTriggerCamCapture" class="cyber-btn primary">
+                            ⚡ CAPTURE FRAME FROM ESP32-CAM
+                        </button>
+                        <span class="cam-meta-tag">SENSOR: OV2640 UXGA / DVP INTERFACE</span>
+                    </div>
+
+                    <!-- Display for Captured Frame -->
+                    <div id="camCaptureResultArea" class="cam-preview-box" style="display: none;">
+                        <div class="preview-label">CAPTURED OPTICAL FRAME (RAW ESP32-CAM)</div>
+                        <div class="cam-img-frame">
+                            <img id="camCapturedImg" src="" alt="Captured Frame">
+                        </div>
+
+                        <!-- Quality Warning Banner -->
+                        <div class="alert-box alert-warning" id="camQualityWarning">
+                            <div class="alert-header">
+                                <span class="alert-icon">⚠️</span>
+                                <span class="alert-title">POOR CAPTURE QUALITY DETECTED</span>
+                            </div>
+                            <div class="alert-body" id="camWarningText">
+                                Not proper capture of the image or less brightness detected! Optical sensor underexposure / low illumination detected from ESP32-CAM. Image clarity is suboptimal for automated CV segmentation. Please adjust lighting or upload high-resolution image from laptop.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: LAPTOP UPLOAD & OPENCV ANALYSIS VIEW -->
+                <div id="sectionLaptop" class="recon-section">
+                    
+                    <!-- Clean File Upload Input / Drag & Drop -->
+                    <div class="drop-zone" id="dropZone">
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                        <div class="drop-content">
+                            <div class="upload-icon">📁</div>
+                            <div class="upload-text">DRAG &amp; DROP IMAGE HERE OR <span class="link-span">BROWSE FROM LAPTOP</span></div>
+                            <div class="upload-subtext">Upload any desktop image to segment Drought Desiccation vs Flood Inundation</div>
+                        </div>
+                    </div>
+
+                    <!-- Loader Spinner -->
+                    <div id="cvLoadingSpinner" class="cv-loader" style="display: none;">
+                        <div class="cyber-spinner"></div>
+                        <div class="loader-text">RUNNING OPENCV SEGMENTATION &amp; SKY EXCLUSION ALGORITHM...</div>
+                    </div>
+
+                    <!-- CRITICAL USER-MANDATED ALERT: "UPLOAD THE RIGHT IMAGE" -->
+                    <div id="invalidImageAlert" class="alert-box alert-danger" style="display: none;">
+                        <div class="alert-header">
+                            <span class="alert-icon">🛑</span>
+                            <span class="alert-title-lg">UPLOAD THE RIGHT IMAGE</span>
+                        </div>
+                        <div class="alert-body">
+                            <p id="invalidReasonText">This image does not contain recognizable Drought Desiccation fissures or Heavy Rainfall Inundation patterns.</p>
+                            <div class="alert-hint">Please upload a valid natural terrain image depicting either parched cracked drought soil or flooded landscape.</div>
+                        </div>
+                    </div>
+
+                    <!-- SUCCESSFUL CV ANALYSIS RESULTS DISPLAY -->
+                    <div id="cvResultsContainer" class="cv-results-card" style="display: none;">
+                        
+                        <!-- Top Classification Badge & Summary -->
+                        <div class="results-header-banner" id="resultBanner">
+                            <div class="badge-col">
+                                <span class="disaster-badge" id="categoryBadge">DROUGHT DETECTED</span>
+                            </div>
+                            <div class="metrics-summary-col">
+                                <div class="metric-pill" id="waterMetricPill">
+                                    <span class="lbl">WATER COVERAGE:</span>
+                                    <strong class="val" id="resWaterPct">0.0%</strong>
+                                </div>
+                                <div class="metric-pill" id="droughtMetricPill">
+                                    <span class="lbl">NO WATER / DROUGHT:</span>
+                                    <strong class="val" id="resDroughtPct">90.6%</strong>
+                                </div>
+                                <div class="metric-pill" id="skyMetricPill">
+                                    <span class="lbl">SKY EXCLUDED:</span>
+                                    <strong class="val" id="resSkyPct">30.0%</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Negative Factor Alert Notice -->
+                        <div class="sky-exclusion-notice">
+                            <span class="icon">🛡️</span>
+                            <span><strong>Sky Negative Factor Eliminated:</strong> Upper atmospheric horizon (<span id="resSkyPctText">30.0%</span>) was detected and strictly excluded so sky is never counted as water!</span>
+                        </div>
+
+                        <!-- Result Status Message -->
+                        <div class="status-callout" id="resStatusMessage">
+                            Critical Drought Conditions Detected: 90.6% of ground is severely desiccated cracked soil. Surface water: 0.0% (Zero Water Detected).
+                        </div>
+
+                        <!-- Image Display Tabs -->
+                        <div class="view-tabs">
+                            <button class="view-tab active" data-view="side_by_side">SIDE-BY-SIDE VIEW</button>
+                            <button class="view-tab" data-view="overlay">SEGMENTATION OVERLAY</button>
+                            <button class="view-tab" data-view="mask">BINARY COVERAGE MASK</button>
+                        </div>
+
+                        <!-- Dynamic Image Display Box -->
+                        <div class="analysis-image-viewer">
+                            <img id="analysisDisplayImg" src="" alt="OpenCV Segmentation Output">
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
